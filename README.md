@@ -1,14 +1,10 @@
 # Baseline Predictive Pipeline -- ETAI
 
-This is the **starting point** for your semester project: a small but *complete* predictive pipeline -- every piece a real project needs (entry point, config, data loading, preprocessing, model, evaluation), just kept as simple as possible for now.
+Diogo Nogueira Padilha 20260620
 
 The task: predict two-year recidivism using ProPublica's COMPAS
 dataset -- the data behind a real 2016 investigation into a risk-
 assessment algorithm actually used by US courts to help inform bail and sentencing decisions. See `data/README.md` for the full problem description and a complete data dictionary before you start.
-
-It has some **deliberately weak spots**. Part of your work this
-semester is finding them and making them better -- see the pipeline progress table below, which tracks what changes and why as the weeks
-go on.
 
 ## Project structure
 
@@ -31,11 +27,12 @@ go on.
 
 ## Pipeline progress
 
-This table is updated after each practical class, so you can always see what changed in the pipeline and why -- it's a running log, not a fixed syllabus.
+Week  2: 
+  - Introduction & baseline pipeline 
 
-| Week | Practical class focus | Added to the pipeline |
-|------|------------------------|------------------------|
-| 2 | Introduction & baseline pipeline | Initial version: project structure, a single naive train/test split (no cross-validation), minimal preprocessing (drop rows with missing values, one-hot encode categoricals), logistic regression baseline, a first (deliberately simple) fairness check comparing our model's and COMPAS's own false-positive rate by race, train-vs-test accuracy reporting (to start spotting overfitting), and each run's full report saved automatically to `results/` |
+  - Initial version: project structure, a single naive train/test split (no cross-validation), minimal preprocessing (drop rows with missing values, one-hot encode categoricals), logistic regression baseline, a first (deliberately simple) fairness check comparing our model's and COMPAS's own false-positive rate by race, train-vs-test accuracy reporting (to start spotting overfitting), and each run's full report saved automatically to `results/` 
+
+  - Results: Logistic Regression outperforms the Decision Tree primarily because the tree suffers from severe overfitting. Without hyperparameter constraints (like maximum depth), the decision tree memorizes the training data noise rather than learning general patterns, leading to poor generalization on new data. In contrast, Logistic Regression acts as a natural regularizer, offering a more stable linear decision boundary that generalizes much better to unseen test cases.
 
 ## Environment setup
 
