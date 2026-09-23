@@ -34,6 +34,18 @@ Week  2:
 
   - Results: Logistic Regression outperforms the Decision Tree primarily because the tree suffers from severe overfitting. Without hyperparameter constraints (like maximum depth), the decision tree memorizes the training data noise rather than learning general patterns, leading to poor generalization on new data. In contrast, Logistic Regression acts as a natural regularizer, offering a more stable linear decision boundary that generalizes much better to unseen test cases.
 
+Week 3:
+  - EDA + preprocessing -- diagnose the data, then fix it
+
+  - Results: The apparent decrease in overall accuracy does not indicate worse models, but rather a more realistic evaluation after removing data leakage. Cleaning duplicates, text anomalies, and highly collinear features prevented the models from relying on invalid shortcuts.
+
+For Logistic Regression, standardizing racial categories improved fairness, reducing the False Positive Rate for African Americans to **0.27**, compared with **0.43** in COMPAS. The slight drop in test accuracy from **0.677 to 0.657** reflects reduced reliance on noise and leakage.
+
+For the Decision Tree, overfitting increased from **0.195 to 0.288**, with test accuracy falling to **0.590**. The unrestricted tree exploited the richer, cleaner features to memorize training data rather than generalize.
+
+Overall, preprocessing provided a more reliable assessment: **Logistic Regression showed greater robustness, while the Decision Tree clearly requires hyperparameter constraints to control overfitting.**
+
+
 ## Environment setup
 
 You only need to do this once per machine.

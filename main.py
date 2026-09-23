@@ -28,12 +28,8 @@ def main():
     df = load_data(config["data"]["path"])
 
     X_train, X_test, y_train, y_test, extras_test = preprocess(
-        df,
-        target=config["data"]["target"],
-        sensitive_attr=config["data"]["sensitive_attr"],
-        drop_columns=config["data"]["drop_columns"],
-        test_size=config["split"]["test_size"],
-        random_state=config["split"]["random_state"],
+        df, 
+        config=config
     )
 
     model = build_model(config["model"])
