@@ -45,6 +45,19 @@ For the Decision Tree, overfitting increased from **0.195 to 0.288**, with test 
 
 Overall, preprocessing provided a more reliable assessment: **Logistic Regression showed greater robustness, while the Decision Tree clearly requires hyperparameter constraints to control overfitting.**
 
+Week 4:
+  - Preprocessing inside the pipeline + cross-validation -- evaluating a model honestly
+
+  - Results: Stratified 5-fold cross-validation allowed a closer look at each model's predictive stability and bias.
+
+A Dummy classifier was included to establish a statistical baseline. By always predicting the majority class ("does not reoffend"), it reached an accuracy of 0.550 on the test set. Any more complex model must therefore beat this figure; otherwise it is not learning patterns in reoffending, merely reproducing elementary descriptive statistics. Its false positive rate (FPR) of 0.00 is purely illustrative, since the model never makes a positive prediction.
+
+Among the linear models, logistic regression performed best. It achieved a cross-validated accuracy of 0.674 with a train–validation gap of only +0.002, indicating strong generalisation and resistance to overfitting. It was also the fairest model, lowering the FPR for African-American defendants to 0.27, well below the 0.43 produced by the original COMPAS score.
+
+The non-linear models behaved quite differently. The single decision tree was clearly unstable: it scored 0.696 on training data but only 0.598 on validation, a gap of +0.098 typical of overfitting, which suggests its splits memorised noise rather than isolating signal. The random forest, despite being a robust ensemble, showed a similar pattern, with 0.738 on training against 0.652 on validation (a gap of +0.086). More critically, it brought the African-American FPR back to 0.40, close to the COMPAS level.
+
+These results make logistic regression the best model so far. This is due not to raw predictive power but to the fact that a constrained model can generalise better and treat groups more equitably than more flexible algorithms, which readily absorb the biases present in the data.
+
 
 ## Environment setup
 

@@ -1,14 +1,10 @@
 """
 Entry point for the baseline predictive pipeline.
-
-Run with:
-    python main.py
-
-This orchestrates the full (deliberately simple) pipeline:
-    load config -> load data -> preprocess -> split -> train
-    -> evaluate (train & test) -> save results
 """
 import yaml
+import numpy as np
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import StratifiedKFold, cross_validate
 
 from src.data import load_data
 from src.preprocessing import preprocess
@@ -27,19 +23,64 @@ def main():
 
     df = load_data(config["data"]["path"])
 
-    X_train, X_test, y_train, y_test, extras_test = preprocess(
+    # Receber o X_dev puro e o preprocessor
+    X_dev, X_test, y_dev, y_test, extras_test, preprocessor = preprocess(
         df, 
         config=config
     )
 
+    # Construir o modelo estático
     model = build_model(config["model"])
-    model.fit(X_train, y_train)
+    
+    # Criar o Pipeline (liga as transformações diretamente ao modelo)
+    pipeline = make_pipeline(preprocessor, model)
 
-    # predict on both splits -- train accuracy vs. test accuracy is how we'll spot overfitting, not just how "good" the model looks
-    y_train_pred = model.predict(X_train)
-    y_test_pred = model.predict(X_test)
+    # ---------------------------------------------------------
+    # 1. Stratified 5-Fold Cross-Validation (Apenas no conjunto Dev)
+    # ---------------------------------------------------------
+    print("A executar Stratified 5-Fold Cross-Validation...")
+    skf = StratifiedKFold(
+        n_splits=5, 
+        shuffle=True, 
+        random_state=config["split"]["random_state"]
+    )
 
-    report = evaluate(y_train, y_train_pred, y_test, y_test_pred)
+    cv_results = cross_validate(
+        pipeline,
+        X_dev,
+        y_dev,
+        cv=skf,
+        scoring=["accuracy"], 
+        return_train_score=True
+    )
+
+    train_acc_mean = np.mean(cv_results['train_accuracy'])
+    train_acc_std = np.std(cv_results['train_accuracy'])
+    val_acc_mean = np.mean(cv_results['test_accuracy'])
+    val_acc_std = np.std(cv_results['test_accuracy'])
+
+    cv_report = (
+        "=== Stratified 5-Fold Cross-Validation (Dev Set) ===\n"
+        f"Train Accuracy: {train_acc_mean:.3f} (± {train_acc_std:.3f})\n"
+        f"Val Accuracy:   {val_acc_mean:.3f} (± {val_acc_std:.3f})\n"
+        f"Gap (Train - Val): {train_acc_mean - val_acc_mean:+.3f}\n"
+        "============================================================\n\n"
+    )
+    
+    print(cv_report)
+
+    # ---------------------------------------------------------
+    # 2. Treino Final e Avaliação no Test Set (Holdout)
+    # ---------------------------------------------------------
+    # Treinar o pipeline final com TODOS os dados de desenvolvimento
+    pipeline.fit(X_dev, y_dev)
+
+    # Fazer as previsões usando a pipeline completa
+    y_dev_pred = pipeline.predict(X_dev)
+    y_test_pred = pipeline.predict(X_test)
+
+    # Avaliar (usando dev vs test)
+    report = cv_report + evaluate(y_dev, y_dev_pred, y_test, y_test_pred)
     report += "\n" + fairness_report(
         y_test, y_test_pred, extras_test, sensitive_attr=config["data"]["sensitive_attr"]
     )

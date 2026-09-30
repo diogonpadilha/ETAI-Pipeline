@@ -118,7 +118,7 @@ def split_features_target(df, target, sensitive_attr, drop_columns, indicator_so
     X = df[[c for c in df.columns if c not in always_drop]]
     return X, y, extras
 
-def split_train_test(X, y, extras, test_size: float, random_state: int):
+def split_dev_test(X, y, extras, test_size: float, random_state: int):
     return train_test_split(X, y, extras, test_size=test_size, random_state=random_state, stratify=y)
 
 # ---------------------------------------------------------------------------
@@ -166,7 +166,6 @@ def build_preprocessor(numeric_features, categorical_features, indicator_feature
 def preprocess(
     df: pd.DataFrame,
     config: dict = None,
-    return_preprocessor: bool = False,
 ):
     if config is None:
         config = load_config()
@@ -174,7 +173,6 @@ def preprocess(
     target = config["data"]["target"]
     sensitive_attr = config["data"]["sensitive_attr"]
     
-    # Agregar colunas a eliminar
     drop_columns = config["data"].get("drop_columns", []) + config["diagnostics"].get("redundant_columns", [])
     
     test_size = config["split"]["test_size"]
@@ -191,24 +189,19 @@ def preprocess(
     numeric_features = [c for c in feature_cols if pd.api.types.is_numeric_dtype(X[c])]
     categorical_features = [c for c in feature_cols if c not in numeric_features]
 
-    X_train, X_test, y_train, y_test, extras_train, extras_test = split_train_test(
+    # UTILIZAR A NOVA FUNÇÃO AQUI
+    X_dev, X_test, y_dev, y_test, extras_dev, extras_test = split_dev_test(
         X, y, extras, test_size, random_state
     )
 
-    X_train = X_train.astype({c: object for c in categorical_features})
+    X_dev = X_dev.astype({c: object for c in categorical_features})
     X_test = X_test.astype({c: object for c in categorical_features})
 
+    # CONSTRUIR, MAS NÃO TREINAR
     preprocessor = build_preprocessor(numeric_features, categorical_features, indicator_features, config)
-    
-    if config["preprocessing"]["encoder"] == "target":
-        X_train_t = preprocessor.fit_transform(X_train, y_train)
-    else:
-        X_train_t = preprocessor.fit_transform(X_train)
-        
-    X_test_t = preprocessor.transform(X_test)
 
-    if sensitive_attr in extras_train.columns and extras_train[sensitive_attr].notna().any():
-        extras_test[sensitive_attr] = extras_test[sensitive_attr].fillna(extras_train[sensitive_attr].mode().iloc[0])
+    if sensitive_attr in extras_dev.columns and extras_dev[sensitive_attr].notna().any():
+        extras_test[sensitive_attr] = extras_test[sensitive_attr].fillna(extras_dev[sensitive_attr].mode().iloc[0])
 
-    outputs = (X_train_t, X_test_t, y_train, y_test, extras_test)
-    return outputs + (preprocessor,) if return_preprocessor else outputs
+    # Devolver os dados de desenvolvimento brutos e o transformador
+    return X_dev, X_test, y_dev, y_test, extras_test, preprocessor
