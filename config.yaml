@@ -70,14 +70,27 @@ model:
   # one of: "dummy" (majority-class floor), "logistic_regression", "decision_tree", "random_forest"
   # (random forest: sensible defaults, untuned -- see the example below)
   type: "random_forest"
-  params: 
-    #max_iter: 2000
-  # Random Forest example -- swap the two lines above for these to run it:
-  # type: "random_forest"
-  # params:
-     n_estimators: 300
-     random_state: 42   # forests are random (bootstrap rows + random feature subsets): fix the seed
-     n_jobs: -1         # use every CPU core -- the trees are independent, so they train in parallel
+  params: {}
+
+cv:
+  n_splits: 5
+  random_state: 42
+  scoring: "accuracy"
+
+tuning:
+  enabled: true
+  n_trials: 20
+  search_spaces:
+    decision_tree:
+      model__max_depth: {type: "int", low: 2, high: 15}
+      model__min_samples_split: {type: "int", low: 2, high: 50}
+      model__criterion: {type: "categorical", choices: ["gini", "entropy"]}
+    random_forest:
+      model__max_depth: {type: "int", low: 2, high: 20}
+      model__n_estimators: {type: "int", low: 50, high: 200}
+    logistic_regression:
+      model__C: {type: "float", low: 0.01, high: 10.0, log: true}
+      model__max_iter: {type: "int", low: 1000, high: 3000}
 
 output:
   results_dir: "results"   # each run's full report is saved here as a timestamped .txt file

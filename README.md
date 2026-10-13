@@ -58,6 +58,15 @@ The non-linear models behaved quite differently. The single decision tree was cl
 
 These results make logistic regression the best model so far. This is due not to raw predictive power but to the fact that a constrained model can generalise better and treat groups more equitably than more flexible algorithms, which readily absorb the biases present in the data.
 
+Week 5:
+  - Hyperparameter tuning without leakage
+
+  -Results: Hyperparameter tuning through nested cross-validation successfully mitigated the overfitting previously observed in the non-linear models by constraining their complexity, notably limiting the Decision Tree’s maximum depth to just five. The Random Forest achieved the highest test accuracy (0.671) while demonstrating remarkable generalization, with a minimal train–test accuracy gap of just +0.006.
+
+However, from an algorithmic fairness perspective, the Decision Tree emerged as the most balanced model. It maintained competitive accuracy (0.663) while reducing the False Positive Rate (FPR) for African-American defendants to 0.25, the lowest among the three tuned models and substantially below the 0.43 disparity reported for the original COMPAS system. Logistic Regression exhibited a comparable performance, achieving an accuracy of 0.656 and an FPR of 0.26.
+
+Overall, the strict complexity constraints imposed during hyperparameter tuning improved the models’ generalization and helped limit overfitting. While Random Forest delivered the strongest predictive performance, the Decision Tree offered the most favorable trade-off between accuracy and fairness, highlighting the importance of evaluating classification models beyond predictive performance alone.
+
 
 ## Environment setup
 
