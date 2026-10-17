@@ -17,8 +17,10 @@ from sklearn.preprocessing import (
     OrdinalEncoder,
     RobustScaler,
     StandardScaler,
-    TargetEncoder, # Adicionado para suportar o target encoder do YAML
+    TargetEncoder,
 )
+
+from src.features import COMPASFeatureEngineer
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,6 @@ def _canonicalize_categories(df: pd.DataFrame, canonical_maps: dict) -> pd.DataF
     return out
 
 def _apply_domain_rules(df: pd.DataFrame, validity_rules: dict) -> pd.DataFrame:
-    """Adaptado para ler dicionários min/max do YAML."""
     out = df.copy()
     for col, rule in validity_rules.items():
         if col not in out.columns:
@@ -91,8 +92,6 @@ def clean_dataset(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     out = _canonicalize_categories(out, diag_cfg["canonical_categories"])
     out = _apply_domain_rules(out, diag_cfg["validity_rules"])
     
-    # Eliminar APENAS as redundâncias do EDA nesta fase.
-    # A lista 'drop_columns' será tratada mais à frente na separação das features.
     cols_to_drop = diag_cfg.get("redundant_columns", [])
     return out.drop(columns=[c for c in cols_to_drop if c in out.columns])
 
@@ -128,11 +127,11 @@ _SCALERS = {"none": "passthrough", "standard": StandardScaler, "minmax": MinMaxS
 _ENCODERS = {
     "onehot": lambda: OneHotEncoder(handle_unknown="ignore", sparse_output=False, drop="if_binary"),
     "ordinal": lambda: OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
-    "target": lambda: TargetEncoder(), # Adicionado target encoder
+    "target": lambda: TargetEncoder(),
 }
 
 def build_preprocessor(numeric_features, categorical_features, indicator_features,
-                       config: dict) -> ColumnTransformer:
+                       passthrough_features, config: dict) -> ColumnTransformer:
     prep_cfg = config["preprocessing"]
     
     scaler_factory = _SCALERS[prep_cfg.get("scaler", "none")]
@@ -149,12 +148,18 @@ def build_preprocessor(numeric_features, categorical_features, indicator_feature
         ("impute", SimpleImputer(strategy=cat_strategy)),
         ("encode", encoder_factory()),
     ])
+
+    transformers = [
+        ("numeric", numeric, list(numeric_features)),
+        ("categorical", categorical, list(categorical_features)),
+        ("indicators", "passthrough", list(indicator_features)),
+    ]
+
+    if passthrough_features:
+        transformers.append(("passthrough", "passthrough", list(passthrough_features)))
+
     transformer = ColumnTransformer(
-        [
-            ("numeric", numeric, list(numeric_features)),
-            ("categorical", categorical, list(categorical_features)),
-            ("indicators", "passthrough", list(indicator_features)),
-        ],
+        transformers,
         verbose_feature_names_out=False,
     )
     return transformer.set_output(transform="pandas")
@@ -184,24 +189,46 @@ def preprocess(
     indicator_sources = config["preprocessing"]["mnar_indicator_sources"]
     X, y, extras = split_features_target(df, target, sensitive_attr, drop_columns, indicator_sources)
 
+    # -----------------------------------------------------------------------
+    # Feature Engineering
+    # -----------------------------------------------------------------------
+    fe_cfg = config.get("feature_engineering", {})
+    if fe_cfg.get("enabled", True):
+        fe = COMPASFeatureEngineer(
+            add_aggregates=fe_cfg.get("add_aggregates", True),
+            add_ratios=fe_cfg.get("add_ratios", True),
+            add_flags=fe_cfg.get("add_flags", True),
+            add_log_transforms=fe_cfg.get("add_log_transforms", True),
+        )
+        X = fe.transform(X)
+
     indicator_features = [f"{c}_was_missing" for c in indicator_sources if f"{c}_was_missing" in X.columns]
-    feature_cols = [c for c in X.columns if c not in indicator_features]
+    
+    prep_cfg = config["preprocessing"]
+    passthrough_features = [c for c in prep_cfg.get("passthrough_features", []) if c in X.columns]
+    
+    special_cols = set(indicator_features) | set(passthrough_features)
+    feature_cols = [c for c in X.columns if c not in special_cols]
+    
     numeric_features = [c for c in feature_cols if pd.api.types.is_numeric_dtype(X[c])]
     categorical_features = [c for c in feature_cols if c not in numeric_features]
 
-    # UTILIZAR A NOVA FUNÇÃO AQUI
     X_dev, X_test, y_dev, y_test, extras_dev, extras_test = split_dev_test(
         X, y, extras, test_size, random_state
     )
 
-    X_dev = X_dev.astype({c: object for c in categorical_features})
-    X_test = X_test.astype({c: object for c in categorical_features})
+    X_dev = X_dev.astype({c: object for c in categorical_features if c in X_dev.columns})
+    X_test = X_test.astype({c: object for c in categorical_features if c in X_test.columns})
 
-    # CONSTRUIR, MAS NÃO TREINAR
-    preprocessor = build_preprocessor(numeric_features, categorical_features, indicator_features, config)
+    preprocessor = build_preprocessor(
+        numeric_features=numeric_features,
+        categorical_features=categorical_features,
+        indicator_features=indicator_features,
+        passthrough_features=passthrough_features,
+        config=config,
+    )
 
     if sensitive_attr in extras_dev.columns and extras_dev[sensitive_attr].notna().any():
         extras_test[sensitive_attr] = extras_test[sensitive_attr].fillna(extras_dev[sensitive_attr].mode().iloc[0])
 
-    # Devolver os dados de desenvolvimento brutos e o transformador
     return X_dev, X_test, y_dev, y_test, extras_test, preprocessor

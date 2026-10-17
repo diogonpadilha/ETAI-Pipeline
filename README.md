@@ -67,6 +67,23 @@ However, from an algorithmic fairness perspective, the Decision Tree emerged as 
 
 Overall, the strict complexity constraints imposed during hyperparameter tuning improved the models’ generalization and helped limit overfitting. While Random Forest delivered the strongest predictive performance, the Decision Tree offered the most favorable trade-off between accuracy and fairness, highlighting the importance of evaluating classification models beyond predictive performance alone.
 
+Week 6:
+  - Domain-specific feature engineering (aggregated juvenile history, prior density per adult year, log-transforms, binary flags)
+  - Integration of new ensemble methods (Oblique Random Forest & AdaBoost)
+
+  - **Results:**
+| Model | Default: CV mean ± std (gap) | Tuned: nested CV mean ± std (gap) | Tuning score (best trial) | Chosen hyperparameters |
+|---|---|---|---|---|
+| **Logistic regression** | — | 0.677 (+0.009) | 0.678 | `C = 1.570`, `max_iter = 2197` |
+| **Decision tree** | — | 0.669 (-0.004) | 0.672 | `max_depth = 4`, `min_samples_split = 45`, `criterion = 'entropy'` |
+| **Random forest** | — | 0.677 (+0.012) | 0.677 | `max_depth = 4`, `n_estimators = 73` |
+| **Oblique random forest** | — | 0.678 (+0.005) | 0.678 | `max_depth = 5`, `min_samples_leaf = 103`, `n_components = 10` |
+| **AdaBoost** | — | 0.672 (+0.012) | 0.674 | `n_estimators = 198`, `learning_rate = 0.105` |
+
+The integration of domain-specific feature engineering (aggregating juvenile/adult offense history, computing prior density per adult year, and applying log transformations) alongside advanced ensemble models enriched the predictive feature space while avoiding target leakage. Through nested cross-validation, the **Oblique Random Forest** achieved the highest honest accuracy (nested CV score of 0.678) with exceptional generalization (train–test gap of +0.005). **Logistic Regression** (0.677) and standard **Random Forest** (0.677) followed closely, proving that hyperparameter tuning effectively regularizes both linear and non-linear models.
+
+Both **AdaBoost** and the **Decision Tree** achieved the lowest FPR for African-American defendants (0.27), closely followed by the **Oblique Random Forest** (0.28), demonstrating that feature engineering combined with ensemble tuning delivers an optimal balance of predictive performance, generalization, and algorithmic equity.
+
 
 ## Environment setup
 
