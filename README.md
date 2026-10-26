@@ -84,6 +84,28 @@ The integration of domain-specific feature engineering (aggregating juvenile/adu
 
 Both **AdaBoost** and the **Decision Tree** achieved the lowest FPR for African-American defendants (0.27), closely followed by the **Oblique Random Forest** (0.28), demonstrating that feature engineering combined with ensemble tuning delivers an optimal balance of predictive performance, generalization, and algorithmic equity.
 
+Week 7:
+- Shift to multi-metric evaluation (using ROC-AUC as the primary selection metric, alongside PR-AUC and out-of-fold probabilities).
+- Integration of new boosting architectures (`gradient_boosting`, `hist_gradient_boosting`) and a probabilistic baseline (`naive_bayes`).
+- Centralized global scoreboard implementation for tracking nested CV performance across all trials.
+
+**Results:**
+
+| Model | Default: CV mean ± std (gap) | Tuned: nested CV mean ROC-AUC (gap) | Tuning score (inner best) | Chosen hyperparameters |
+|---|---|---|---|---|
+| **Gradient boosting** | — | 0.726 (+0.001) | 0.726 | `max_depth = 2`, `n_estimators = 126`, `learning_rate = 0.078` |
+| **Oblique random forest** | — | 0.726 (+0.000) | 0.726 | `max_depth = 27`, `min_samples_leaf = 85`, `n_components = 9` |
+| **Logistic regression** | — | 0.725 (-0.001) | 0.725 | `C = 3.038`, `max_iter = 1641` |
+| **Hist gradient boosting** | — | 0.724 (+0.002) | 0.726 | `max_depth = 1`, `learning_rate = 0.180` |
+| **Random forest** | — | 0.723 (+0.003) | 0.726 | `max_depth = 6`, `n_estimators = 109` |
+| **AdaBoost** | — | 0.722 (+0.001) | 0.723 | `n_estimators = 182`, `learning_rate = 0.190` |
+| **Decision tree** | — | 0.715 (-0.002) | 0.713 | `max_depth = 4`, `min_samples_split = 9`, `criterion = 'entropy'` |
+| **Naive Bayes** | — | 0.703 (+0.004) | 0.706 | None (Probabilistic baseline) |
+
+The transition to evaluating models via out-of-fold ROC-AUC probability scoring confirmed a highly competitive and robust predictive space. The **Gradient Boosting** and **Oblique Random Forest** architectures achieved the highest honest generalization, both tying at a nested CV ROC-AUC score of 0.726 with virtually zero optimism bias (+0.001 and +0.000, respectively). Notably, **Logistic Regression** maintained exceptional stability (0.725) despite its linear simplicity, closely matching the performance of the complex tree-based ensembles.
+
+From an algorithmic fairness perspective, all implemented models successfully suppressed the 0.43 False Positive Rate (FPR) originally observed in the COMPAS system for African-American defendants. While **Naive Bayes** established the absolute lowest FPR (0.17), it did so at a significant cost to overall predictive performance (0.703 ROC-AUC). Among the top-tier models, **AdaBoost** achieved the best equity balance with an FPR of 0.26, followed by both variations of **Gradient Boosting** (0.28).
+
 
 ## Environment setup
 

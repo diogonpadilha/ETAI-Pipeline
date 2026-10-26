@@ -1,46 +1,58 @@
-"""Evaluation -- single train/test split, no cross-validation (yet)."""
+"""Evaluation -- multi-metric evaluation, out-of-fold predictions, and fairness."""
 import pandas as pd
-from sklearn.metrics import accuracy_score, classification_report
+import numpy as np
+from sklearn.metrics import (
+    accuracy_score, balanced_accuracy_score, precision_score, recall_score,
+    f1_score, fbeta_score, roc_auc_score, average_precision_score,
+    confusion_matrix, classification_report
+)
 
+def build_scorers(metrics: list) -> dict:
+    """Mapeia os nomes das métricas do config.yaml para as funções do scikit-learn."""
+    available = {
+        "accuracy": accuracy_score,
+        "balanced_accuracy": balanced_accuracy_score,
+        "precision": lambda y, p: precision_score(y, p, zero_division=0),
+        "recall": lambda y, p: recall_score(y, p, zero_division=0),
+        "f1": lambda y, p: f1_score(y, p, zero_division=0),
+        "f_beta": lambda y, p: fbeta_score(y, p, beta=2.0, zero_division=0), # Penaliza mais os falsos negativos
+        "roc_auc": roc_auc_score,
+        "pr_auc": average_precision_score
+    }
+    return {m: available[m] for m in metrics if m in available}
 
-def evaluate(y_train, y_train_pred, y_test, y_pred) -> str:
-    """
-    Prints -- and returns as text, so it can also be saved to disk -- train accuracy and test accuracy side by side, plus the usual classification report on the test set.
-    """
-    train_accuracy = accuracy_score(y_train, y_train_pred)
-    test_accuracy = accuracy_score(y_test, y_pred)
-    gap = train_accuracy - test_accuracy
-
-    lines = [
-        f"Train accuracy: {train_accuracy:.3f}",
-        f"Test accuracy:  {test_accuracy:.3f}",
-        f"Gap (train - test): {gap:+.3f}",
-    ]
+def oof_classification_report(y_true, y_pred, y_prob=None) -> str:
+    """Gera o relatório de classificação e a matriz de confusão."""
+    lines = ["=== Classification Report & Confusion Matrix ==="]
+    
+    # Matriz de Confusão
+    cm = confusion_matrix(y_true, y_pred)
+    lines.append("Confusion Matrix (Predicted 0 | Predicted 1):")
+    lines.append(f"Actual 0:  {cm[0, 0]:<5d} | {cm[0, 1]:<5d}")
+    lines.append(f"Actual 1:  {cm[1, 0]:<5d} | {cm[1, 1]:<5d}")
     lines.append("")
-    lines.append("Classification report (test set):")
-    lines.append(classification_report(y_test, y_pred))
-
-    text = "\n".join(lines)
-    print(text)
-    return text
-
+    
+    # Relatório padrão
+    lines.append(classification_report(y_true, y_pred, zero_division=0))
+    
+    # Métricas de probabilidade se fornecidas
+    if y_prob is not None:
+        roc_auc = roc_auc_score(y_true, y_prob)
+        pr_auc = average_precision_score(y_true, y_prob)
+        lines.append(f"ROC-AUC: {roc_auc:.3f}")
+        lines.append(f"PR-AUC:  {pr_auc:.3f}")
+        
+    return "\n".join(lines)
 
 def fairness_report(y_test, y_pred, extras_test: pd.DataFrame, sensitive_attr: str = "race") -> str:
-    """
-    Deliberately simple fairness check -- not a substitute for a real audit, just enough to show that "accuracy" and "fair" are not the same thing.
-
-    For each race group, prints (and returns as text) the false
-    positive rate (share of people who did NOT reoffend but were
-    predicted to) for:
-        - our own model
-        - COMPAS's own risk score (score_text != "Low" counts as a "high risk" prediction), for comparison
-    """
+    """Calcula a Taxa de Falsos Positivos por grupo demográfico[cite: 4]."""
     df = extras_test.copy()
     df["y_true"] = y_test.values
     df["y_pred_model"] = y_pred
     df["y_pred_compas"] = (df["score_text"] != "Low").astype(int)
 
     lines = [
+        "=== Fairness Report ===",
         "False positive rate by race",
         "(share of people who did NOT reoffend, but were predicted to)",
         "",
@@ -56,6 +68,4 @@ def fairness_report(y_test, y_pred, extras_test: pd.DataFrame, sensitive_attr: s
             lines.append(f"    {group:<20s} FPR = {fpr:.2f}  (n={len(negatives)})")
         lines.append("")
 
-    text = "\n".join(lines)
-    print(text)
-    return text
+    return "\n".join(lines)
