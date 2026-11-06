@@ -1,12 +1,9 @@
 # Baseline pipeline configuration.
-# Nothing here is hardcoded in the source files below -- everything tunable lives in this one place.
 
 data:
   path: "data/compas_two_year_recidivism.csv"
   target: "two_year_recid"
-  sensitive_attr: "race"          # excluded from model features, used only to audit fairness
-  # id/COMPAS's-own-score dropped as before, plus the three columns week 3's multicollinearity
-  # check found redundant (see src/data_diagnostics.py + the EDA notebook's VIF walkthrough)
+  sensitive_attr: "race"
   drop_columns: ["id", "decile_score", "score_text", "prior_offenses", "age_in_months", "juvenile_total"]
 
 split:
@@ -46,7 +43,6 @@ diagnostics:
       high: "High"
   redundant_columns: ["prior_offenses", "age_in_months", "juvenile_total"]
 
-# Configuração de Feature Engineering
 feature_engineering:
   enabled: true
   add_aggregates: true
@@ -54,9 +50,17 @@ feature_engineering:
   add_flags: true
   add_log_transforms: true
 
+# NOVA SECÇÃO: Feature Selection (A2)
+feature_selection:
+  enabled: false
+  params:
+    threshold: 2
+  search_space:
+    selector__threshold: {type: "int", low: 1, high: 3}
+
 preprocessing:
-  encoder: "target"      # winner of the 4x4 empirical grid
-  scaler: "robust"     
+  encoder: "target"
+  scaler: "robust"
   numeric_features: ["age", "juv_fel_count", "juv_misd_count", "juv_other_count", "priors_count"]
   categorical_features: ["sex", "age_cat", "c_charge_degree"]
   passthrough_features: ["has_priors", "has_juv_record"]
@@ -66,8 +70,10 @@ preprocessing:
     categorical_strategy: "most_frequent"
 
 model:
-  type: "gradient_boosting"
-  params: {}
+  type: "xgboost"
+  params:
+    random_state: 42
+    eval_metric: "logloss"
 
 cv:
   n_splits: 5
@@ -96,8 +102,6 @@ tuning:
     adaboost:
       model__n_estimators: {type: "int", low: 50, high: 200}
       model__learning_rate: {type: "float", low: 0.01, high: 1.0, log: true}
-    
-    # NOVOS MODELOS DA SEMANA 7:
     gradient_boosting:
       model__max_depth: {type: "int", low: 1, high: 10}
       model__n_estimators: {type: "int", low: 50, high: 300}
@@ -106,7 +110,11 @@ tuning:
       model__max_depth: {type: "int", low: 1, high: 20}
       model__learning_rate: {type: "float", low: 0.01, high: 0.5, log: true}
     naive_bayes: {}
+    xgboost:
+      model__max_depth: {type: "int", low: 2, high: 10}
+      model__learning_rate: {type: "float", low: 0.01, high: 0.3, log: true}
+      model__n_estimators: {type: "int", low: 50, high: 300}
 
 output:
   results_dir: "results"
-  scoreboard: "results/scoreboard.csv" # NOVA CHAVE DA SEMANA 7
+  scoreboard: "results/scoreboard.csv"
