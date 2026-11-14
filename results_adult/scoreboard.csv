@@ -1,0 +1,11 @@
+timestamp,model,metric,cv_score,params
+2026-11-14 18:06:49,gradient_boosting_with_fs,roc_auc,0.9089,"{""random_state"": 42}"
+2026-11-14 18:47:10,gradient_boosting_with_fs,roc_auc,0.9074,"{""model__max_depth"": 5, ""model__n_estimators"": 260, ""model__learning_rate"": 0.021455107454687313, ""selector__threshold"": 3}"
+2026-11-14 18:52:17,hist_gradient_boosting_with_fs,roc_auc,0.9059,"{""model__max_depth"": 3, ""model__learning_rate"": 0.07596918608355759, ""selector__threshold"": 3}"
+2026-11-14 18:57:55,naive_bayes_with_fs,roc_auc,0.8606,{}
+2026-11-14 19:03:47,logistic_regression_with_fs,roc_auc,0.8943,"{""model__C"": 0.9023321669979296, ""model__max_iter"": 2460, ""selector__threshold"": 3}"
+2026-11-14 19:05:04,decision_tree_with_fs,roc_auc,0.7214,{}
+2026-11-14 19:16:02,random_forest_with_fs,roc_auc,0.9019,"{""model__max_depth"": 8, ""model__n_estimators"": 209, ""selector__threshold"": 3}"
+2026-11-14 19:19:09,adaboost_with_fs,roc_auc,0.8936,{}
+2026-11-14 19:32:46,oblique_random_forest_with_fs,roc_auc,0.8751,{}
+2026-11-14 19:35:29,gradient_boosting_with_fs,roc_auc,0.9089,"{""random_state"": 42}"

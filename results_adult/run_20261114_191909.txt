@@ -1,0 +1,41 @@
+Run: 20261114_191909
+Model: adaboost  params={'random_state': 42}
+Test size: 0.2  random_state: 42
+============================================================
+
+=== Hyperparameter Tuning (Optuna) ===
+Melhores parâmetros: {}
+Score Otimista (Inner best médio - roc_auc): 0.8976
+Score Honesto (Nested CV - roc_auc):         0.8936
+Nested CV Accuracy (OOF Dev):                  0.8450
+Nested CV F1 (OOF Dev, class 1):               0.6250
+Viés de Otimismo:                              +0.0040
+======================================
+
+
+Features kept (27/38): ['age', 'education_num', 'capital_gain', 'capital_loss', 'hours_per_week', 'v02', 'v03', 'v06', 'v07', 'v09', 'v11', 'v12', 'v14', 'v15', 'v16', 'v17', 'workclass', 'marital_status', 'occupation', 'relationship', 'race', 'native_country', 'v21', 'v24', 'v25', 'workclass_was_missing', 'occupation_was_missing']
+Features dropped (11): ['v01', 'v04', 'v05', 'v08', 'v10', 'v13', 'v18', 'v19', 'v20', 'v22', 'v23']
+=== Classification Report & Confusion Matrix ===
+Confusion Matrix (Predicted 0 | Predicted 1):
+Actual 0:  862   | 51   
+Actual 1:  138   | 149  
+
+              precision    recall  f1-score   support
+
+           0       0.86      0.94      0.90       913
+           1       0.74      0.52      0.61       287
+
+    accuracy                           0.84      1200
+   macro avg       0.80      0.73      0.76      1200
+weighted avg       0.83      0.84      0.83      1200
+
+ROC-AUC: 0.896
+PR-AUC:  0.746
+
+=== Fairness Report ===
+False positive rate by sex
+(share of negative cases that were predicted positive)
+
+  Our model:
+    Female               FPR = 0.01  (n=336)
+    Male                 FPR = 0.08  (n=577)

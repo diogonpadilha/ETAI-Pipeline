@@ -1,0 +1,38 @@
+Run: 20261114_180649
+Model: gradient_boosting  params={'random_state': 42}
+Test size: 0.2  random_state: 42
+============================================================
+
+=== Cross-Validation (Default / No Tuning) ===
+CV ROC-AUC:  0.9089 ± 0.0133
+CV Accuracy: 0.8585 ± 0.0095
+CV F1:       0.6641 ± 0.0315
+==============================================
+
+
+Features kept (27/38): ['age', 'education_num', 'capital_gain', 'capital_loss', 'hours_per_week', 'v02', 'v03', 'v06', 'v07', 'v09', 'v11', 'v12', 'v14', 'v15', 'v16', 'v17', 'workclass', 'marital_status', 'occupation', 'relationship', 'race', 'native_country', 'v21', 'v24', 'v25', 'workclass_was_missing', 'occupation_was_missing']
+Features dropped (11): ['v01', 'v04', 'v05', 'v08', 'v10', 'v13', 'v18', 'v19', 'v20', 'v22', 'v23']
+=== Classification Report & Confusion Matrix ===
+Confusion Matrix (Predicted 0 | Predicted 1):
+Actual 0:  868   | 45   
+Actual 1:  120   | 167  
+
+              precision    recall  f1-score   support
+
+           0       0.88      0.95      0.91       913
+           1       0.79      0.58      0.67       287
+
+    accuracy                           0.86      1200
+   macro avg       0.83      0.77      0.79      1200
+weighted avg       0.86      0.86      0.85      1200
+
+ROC-AUC: 0.905
+PR-AUC:  0.784
+
+=== Fairness Report ===
+False positive rate by sex
+(share of negative cases that were predicted positive)
+
+  Our model:
+    Female               FPR = 0.03  (n=336)
+    Male                 FPR = 0.06  (n=577)

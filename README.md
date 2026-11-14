@@ -106,7 +106,7 @@ The transition to evaluating models via out-of-fold ROC-AUC probability scoring 
 
 From an algorithmic fairness perspective, all implemented models successfully suppressed the 0.43 False Positive Rate (FPR) originally observed in the COMPAS system for African-American defendants. While **Naive Bayes** established the absolute lowest FPR (0.17), it did so at a significant cost to overall predictive performance (0.703 ROC-AUC). Among the top-tier models, **AdaBoost** achieved the best equity balance with an FPR of 0.26, followed by both variations of **Gradient Boosting** (0.28).
 
-### Week 8:
+Week 8:
 - Integration of XGBoost (`XGBClassifier`) into the pipeline model registry and configuration search spaces[cite: 16].
 - Implementation of automated feature selection via `VoteSelector`, caching pipeline transformations, and dynamically tuning selector parameters (`selector__threshold`) alongside model hyperparameters[cite: 16].
 - Empirical evaluation comparing tuned XGBoost performance with and without feature selection to analyze dimensionality reduction trade-offs[cite: 16, 20, 21].
@@ -121,6 +121,20 @@ From an algorithmic fairness perspective, all implemented models successfully su
 Integrating **XGBoost** yielded strong, honest predictive performance matching the top-tier models from Week 7, achieving a nested cross-validation ROC-AUC of 0.725 with minimal optimism bias (+0.002) in both pipeline configurations[cite: 20, 21]. When feature selection was enabled, Optuna selected a voting threshold of `threshold = 2`, retaining all 16 engineered features[cite: 20]. Consequently, feature selection did not drop any variables, confirming that all 16 domain-engineered predictors contain meaningful signal for gradient boosted decision trees[cite: 20]. When feature selection was disabled, XGBoost achieved identical nested CV performance (0.725 ROC-AUC) by slightly reducing tree complexity (`max_depth = 2` vs `max_depth = 3`) to prevent overfitting[cite: 20, 21].
 
 On the held-out test set, both XGBoost runs demonstrated consistent generalization with an ROC-AUC of 0.718, PR-AUC of 0.677–0.679, and accuracy of 0.67[cite: 20, 21]. From an algorithmic fairness standpoint, XGBoost maintained a low False Positive Rate for African-American defendants (0.28–0.29), representing a substantial improvement over COMPAS's baseline FPR of 0.43, while preserving equalized odds across demographic groups[cite: 20, 21].
+
+
+Week 9:
+-  Generalize pipeline beyond COMPAS (Option A: Adult Income), CLI multi-config support, missingness indicators, multi-metric nested CV (`ROC-AUC` / `Accuracy` / `F1`), and batch inference on unlabeled data (`adult_new.csv`) | `Gradient boosting` (tuned) | **0.9074** (`Acc: 0.8598`, `F1: 0.6650`) |
+
+## Beyond COMPAS
+
+To test whether the pipeline relies on hidden dataset-specific assumptions, we extended it to **Option A: Adult Income** (`adult_train.csv` with 6,000 labeled rows and `adult_new.csv` with 2,000 unlabeled rows; target `income_over_50k` with 24% positive rate), while keeping the original COMPAS workflow (`python main.py`) completely intact.
+
+### How to run
+
+- **Adult Income pipeline (with hyperparameter tuning and batch predictions):**
+  ```bash
+  python main.py config_adult.yaml
 
 ## Environment setup
 

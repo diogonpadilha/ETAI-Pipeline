@@ -1,0 +1,81 @@
+# Adult Income pipeline configuration (Option A - Beyond COMPAS)
+
+data:
+  path: "data/adult_train.csv"
+  new_data_path: "data/adult_new.csv"
+  target: "income_over_50k"
+  sensitive_attr: "sex"          # auditado na equidade (race mantido como feature)
+  extra_columns: []
+  drop_columns: ["id", "fnlwgt", "education"]
+
+split:
+  test_size: 0.2
+  random_state: 42
+
+diagnostics:
+  id_column: "id"
+  placeholder_tokens: ["-", "?", "n/a", "N/A", "na", "NA", ""]
+  validity_rules:
+    age: {min: 17, max: 90}
+    hours_per_week: {min: 1, max: 99}
+    capital_gain: {min: 0}
+    capital_loss: {min: 0}
+  canonical_categories: {}
+  redundant_columns: ["education"]
+
+feature_engineering:
+  enabled: false
+
+feature_selection:
+  enabled: true
+  params:
+    threshold: 3
+  search_space:
+    selector__threshold: {type: "int", low: 1, high: 3}
+
+preprocessing:
+  encoder: "target"
+  scaler: "robust"
+  mnar_indicator_sources: ["workclass", "occupation"]
+  passthrough_features: []
+  imputation:
+    numeric_strategy: "median"
+    categorical_strategy: "most_frequent"
+
+model:
+  type: "gradient_boosting"
+  params:
+    random_state: 42
+
+cv:
+  n_splits: 5
+  random_state: 42
+  selection_metric: "roc_auc"
+  metrics: ["accuracy", "balanced_accuracy", "precision", "recall", "f1", "f_beta", "roc_auc", "pr_auc"]
+
+tuning:
+  enabled: false  
+  n_trials: 20
+  search_spaces:
+    gradient_boosting:
+      model__max_depth: {type: "int", low: 2, high: 6}
+      model__n_estimators: {type: "int", low: 100, high: 300}
+      model__learning_rate: {type: "float", low: 0.02, high: 0.2, log: true}
+    hist_gradient_boosting:
+      model__max_depth: {type: "int", low: 2, high: 10}
+      model__learning_rate: {type: "float", low: 0.02, high: 0.2, log: true}
+    xgboost:
+      model__max_depth: {type: "int", low: 2, high: 8}
+      model__learning_rate: {type: "float", low: 0.02, high: 0.2, log: true}
+      model__n_estimators: {type: "int", low: 100, high: 300}
+    random_forest:
+      model__max_depth: {type: "int", low: 4, high: 20}
+      model__n_estimators: {type: "int", low: 100, high: 300}
+    logistic_regression:
+      model__C: {type: "float", low: 0.01, high: 10.0, log: true}
+      model__max_iter: {type: "int", low: 1000, high: 3000}
+
+output:
+  results_dir: "results_adult"
+  scoreboard: "results_adult/scoreboard.csv"
+  predictions_path: "results_adult/adult_predictions.csv"
