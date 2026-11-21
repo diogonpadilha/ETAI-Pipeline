@@ -15,10 +15,12 @@ def save_run(results_dir: str, config: dict, report_text: str) -> str:
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     path = os.path.join(results_dir, f"run_{timestamp}.txt")
+    imputer_name = config.get("preprocessing", {}).get("imputation", {}).get("numeric_strategy", "median")
 
     header = (
         f"Run: {timestamp}\n"
         f"Model: {config['model']['type']}  params={config['model']['params']}\n"
+        f"Imputer: {imputer_name}\n"
         f"Test size: {config['split']['test_size']}  "
         f"random_state: {config['split']['random_state']}\n"
         + "=" * 60 + "\n\n"
@@ -30,7 +32,7 @@ def save_run(results_dir: str, config: dict, report_text: str) -> str:
     return path
 
 
-def save_scores(scoreboard_path: str, model_name: str, metric: str, score: float, params: dict) -> None:
+def save_scores(scoreboard_path: str, model_name: str, metric: str, score: float, params: dict, imputer: str = "median") -> None:
     """
     Appends one model evaluation row to the centralized CSV scoreboard.
     """
@@ -44,5 +46,5 @@ def save_scores(scoreboard_path: str, model_name: str, metric: str, score: float
     with open(scoreboard_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["timestamp", "model", "metric", "cv_score", "params"])
-        writer.writerow([timestamp, model_name, metric, f"{score:.4f}", json.dumps(params)])
+            writer.writerow(["timestamp", "model", "imputer", "metric", "cv_score", "params"])
+        writer.writerow([timestamp, model_name, imputer, metric, f"{score:.4f}", json.dumps(params)])

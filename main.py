@@ -1,8 +1,9 @@
 """
-Entry point for the predictive pipeline (supports multiple datasets via CLI config).
+Entry point for the predictive pipeline (supports multiple datasets and model serialization).
 """
 import os
 import sys
+import joblib
 import yaml
 import numpy as np
 import pandas as pd
@@ -26,6 +27,9 @@ def main():
     config = load_config(config_path)
     df = load_data(config["data"]["path"])
 
+    imputer_name = config.get("preprocessing", {}).get("imputation", {}).get("numeric_strategy", "median")
+    print(f"Running pipeline | config={config_path} | model={config['model']['type']} | imputer={imputer_name}")
+
     X_dev, X_test, y_dev, y_test, extras_test, preprocessor = preprocess(df, config=config)
 
     fs_config = config.get("feature_selection", {})
@@ -33,7 +37,7 @@ def main():
 
     tuning_report = ""
     cv_score = 0.0
-    best_params = config["model"].get("params", {}).copy()
+    best_params = (config["model"].get("params") or {}).copy()
 
     if config.get("tuning", {}).get("enabled", False):
         if fs_config.get("enabled", False) and "search_space" in fs_config:
@@ -99,17 +103,24 @@ def main():
     scoreboard_path = config.get("output", {}).get("scoreboard", "results/scoreboard.csv")
     selection_metric = config.get("cv", {}).get("selection_metric", "roc_auc")
     model_name = config["model"]["type"] + ("_with_fs" if fs_config.get("enabled", False) else "")
-    save_scores(scoreboard_path, model_name, selection_metric, cv_score, best_params)
+    save_scores(scoreboard_path, model_name, selection_metric, cv_score, best_params, imputer=imputer_name)
     print(f"Resultado guardado no scoreboard central: {scoreboard_path}")
 
-    # Previsão em dados novos sem target (ex: adult_new.csv)
+    # Guardar a pipeline final ajustada para inferência (predict.py)
+    model_path = config.get("output", {}).get("model_path", "models/model.joblib")
+    os.makedirs(os.path.dirname(model_path) or ".", exist_ok=True)
+    pipeline.set_params(memory=None)
+    joblib.dump(pipeline, model_path)
+    print(f"Modelo final guardado em: {model_path}")
+
+    # Previsão em dados novos se configurado (ex: adult_new.csv)
     new_data_path = config["data"].get("new_data_path")
     predictions_output = config["output"].get("predictions_path")
     if new_data_path and predictions_output:
         df_new = load_data(new_data_path)
         X_new, ids = prepare_inference_features(df_new, config)
         new_probs = pipeline.predict_proba(X_new)[:, 1] if hasattr(pipeline, "predict_proba") else np.zeros(len(X_new))
-        new_preds = pipeline.predict(X_new)
+        new_preds = (new_probs >= 0.5).astype(int) if hasattr(pipeline, "predict_proba") else pipeline.predict(X_new)
 
         out_dir = os.path.dirname(predictions_output)
         if out_dir:

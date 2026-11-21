@@ -50,7 +50,7 @@ feature_engineering:
   add_flags: true
   add_log_transforms: true
 
-# NOVA SECÇÃO: Feature Selection (A2)
+# Feature Selection
 feature_selection:
   enabled: false
   params:
@@ -61,16 +61,20 @@ feature_selection:
 preprocessing:
   encoder: "target"
   scaler: "robust"
+  random_state: 42
   numeric_features: ["age", "juv_fel_count", "juv_misd_count", "juv_other_count", "priors_count"]
   categorical_features: ["sex", "age_cat", "c_charge_degree"]
   passthrough_features: ["has_priors", "has_juv_record"]
   mnar_indicator_sources: ["priors_count", "c_charge_degree"]
   imputation:
-    numeric_strategy: "median"
+    numeric_strategy: "median"        # median | mean | knn | iterative | random_forest
     categorical_strategy: "most_frequent"
+    n_neighbors: 5                    # knn
+    max_iter: 10                      # iterative, random_forest
+    n_estimators: 50                  # random_forest (trees per column)
 
 model:
-  type: "xgboost"
+  type: "gradient_boosting"
   params:
     random_state: 42
     eval_metric: "logloss"
@@ -118,3 +122,4 @@ tuning:
 output:
   results_dir: "results"
   scoreboard: "results/scoreboard.csv"
+  model_path: "models/model.joblib"

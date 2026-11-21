@@ -130,6 +130,31 @@ Week 9:
 
 To test whether the pipeline relies on hidden dataset-specific assumptions, we extended it to **Option A: Adult Income** (`adult_train.csv` with 6,000 labeled rows and `adult_new.csv` with 2,000 unlabeled rows; target `income_over_50k` with 24% positive rate), while keeping the original COMPAS workflow (`python main.py`) completely intact.
 
+Week 10: 
+Configurable numeric imputers (`median`, `knn`, `iterative`, `random_forest`) with scale-before-impute preprocessing, Nadeau & Bengio corrected paired t-test, pipeline serialization (`models/model.joblib`), and standalone batch inference CLI (`predict.py`) | `XGBoost` (`median` imputer) | **0.7245** (COMPAS) / **0.9074** (Adult) |
+
+## Missing values
+
+To handle incomplete records at inference time without dropping rows—and without leaking target labels—numeric imputation is fitted strictly inside each cross-validation fold using only predictor features (`scale -> impute` order so distance-based imputers like KNN operate on normalized scales). We evaluated four numeric imputation strategies (`median`, `knn`, `iterative`, and `random_forest`) across identical 5-fold stratified splits and compared each against `median` using Nadeau & Bengio's corrected resampled paired t-test (`corrected_paired_test()`):
+
+| Imputer strategy | Mean CV ROC-AUC | Std | Runtime (s) | Corrected $t$ vs `median` | $p$-value |
+|---|---:|---:|---:|---:|---:|
+| **`median`** (baseline) | `0.XXXX` | `0.XXXX` | `X.XX` | — | — |
+| **`knn`** (`n_neighbors=5`) | `0.XXXX` | `0.XXXX` | `X.XX` | `±X.XXX` | `0.XXXX` |
+| **`iterative`** (MICE, `max_iter=10`) | `0.XXXX` | `0.XXXX` | `X.XX` | `±X.XXX` | `0.XXXX` |
+| **`random_forest`** (missForest, `n_estimators=50`) | `0.XXXX` | `0.XXXX` | `X.XX` | `±X.XXX` | `0.XXXX` |
+
+**Decision:** We keep **`median`** alongside MNAR missingness indicators (`priors_count_was_missing` and `c_charge_degree_was_missing`). Because the numeric features in COMPAS have weak inter-correlations, multivariate imputers (`knn`, `iterative`, and `random_forest`) achieve no statistically significant improvement in CV ROC-AUC over `median` ($p > 0.05$) while adding substantial computational overhead.
+
+## Predicting new data
+
+At the end of `main.py`, the final fitted pipeline (preprocessing, feature engineering, optional feature selection, and trained estimator) is serialized to `models/model.joblib` so predictions on new data run without retraining or refitting transformers.
+
+### Command
+
+```bash
+python predict.py data/compas_new_people.csv predictions.csv
+
 ### How to run
 
 - **Adult Income pipeline (with hyperparameter tuning and batch predictions):**

@@ -1,7 +1,8 @@
-"""Evaluation utilities: classification report, multi-metric scorers, and fairness audit."""
+"""Evaluation utilities: classification report, multi-metric scorers, paired t-test, and fairness audit."""
+import numpy as np
 import pandas as pd
+from scipy import stats
 from sklearn.metrics import (
-    accuracy_score,
     average_precision_score,
     classification_report,
     confusion_matrix,
@@ -24,6 +25,25 @@ def build_scorers(metric_names: list) -> dict:
         "pr_auc": "average_precision",
     }
     return {m: available[m] for m in metric_names if m in available}
+
+
+def corrected_paired_test(scores_a, scores_b, n_train: int, n_test: int) -> tuple[float, float]:
+    """
+    Nadeau & Bengio's corrected resampled paired t-test across k-fold CV scores.
+    Returns (t_stat, p_value).
+    """
+    diffs = np.asarray(scores_a, dtype=float) - np.asarray(scores_b, dtype=float)
+    k = len(diffs)
+    mean_diff = np.mean(diffs)
+    var_diff = np.var(diffs, ddof=1)
+
+    if var_diff < 1e-12:
+        return 0.0, 1.0
+
+    corrected_var = (1.0 / k + n_test / n_train) * var_diff
+    t_stat = mean_diff / np.sqrt(corrected_var)
+    p_value = 2.0 * stats.t.sf(np.abs(t_stat), df=k - 1)
+    return float(t_stat), float(p_value)
 
 
 def oof_classification_report(y_true, y_pred, y_prob=None) -> str:
@@ -50,7 +70,7 @@ def oof_classification_report(y_true, y_pred, y_prob=None) -> str:
 
 
 def fairness_report(y_test, y_pred, extras_test: pd.DataFrame, sensitive_attr: str = "race") -> str:
-    """Calcula a Taxa de Falsos Positivos por grupo demográfico (funciona com qualquer dataset)."""
+    """Calcula a Taxa de Falsos Positivos por grupo demográfico."""
     df = extras_test.copy()
     df["y_true"] = y_test.values
     df["y_pred_model"] = y_pred

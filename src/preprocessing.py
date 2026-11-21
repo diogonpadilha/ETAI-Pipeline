@@ -7,7 +7,9 @@ import yaml
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.experimental import enable_iterative_imputer  # noqa: F401
+from sklearn.impute import IterativeImputer, KNNImputer, SimpleImputer
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (
@@ -130,33 +132,62 @@ def split_dev_test(X, y, extras, test_size: float, random_state: int):
 
 
 # ---------------------------------------------------------------------------
-# 3. Leak-safe preprocessor
+# 3. Leak-safe preprocessor (scales first, then imputes)
 # ---------------------------------------------------------------------------
-_SCALERS = {"none": "passthrough", "standard": StandardScaler, "minmax": MinMaxScaler, "robust": RobustScaler}
+_SCALERS = {
+    "none": "passthrough",
+    "standard": StandardScaler,
+    "minmax": MinMaxScaler,
+    "robust": RobustScaler,
+}
+
 _ENCODERS = {
-    "onehot": lambda: OneHotEncoder(handle_unknown="ignore", sparse_output=False, drop="if_binary"),
-    "ordinal": lambda: OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
-    "target": lambda: TargetEncoder(random_state=42),
+    "onehot": lambda seed=42: OneHotEncoder(handle_unknown="ignore", sparse_output=False, drop="if_binary"),
+    "ordinal": lambda seed=42: OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+    "target": lambda seed=42: TargetEncoder(random_state=seed),
+}
+
+_NUMERIC_IMPUTERS = {
+    "median": lambda cfg, seed: SimpleImputer(strategy="median"),
+    "mean": lambda cfg, seed: SimpleImputer(strategy="mean"),
+    "knn": lambda cfg, seed: KNNImputer(n_neighbors=cfg.get("n_neighbors", 5)),
+    "iterative": lambda cfg, seed: IterativeImputer(max_iter=cfg.get("max_iter", 10), random_state=seed),
+    "random_forest": lambda cfg, seed: IterativeImputer(
+        estimator=RandomForestRegressor(
+            n_estimators=cfg.get("n_estimators", 50),
+            min_samples_leaf=5,
+            random_state=seed,
+            n_jobs=-1,
+        ),
+        max_iter=cfg.get("max_iter", 10),
+        random_state=seed,
+    ),
 }
 
 
 def build_preprocessor(numeric_features, categorical_features, indicator_features,
                        passthrough_features, config: dict) -> ColumnTransformer:
     prep_cfg = config["preprocessing"]
+    imputation = prep_cfg.get("imputation", {})
+    seed = prep_cfg.get("random_state", config.get("split", {}).get("random_state", 42))
 
     scaler_factory = _SCALERS[prep_cfg.get("scaler", "none")]
-    encoder_factory = _ENCODERS[prep_cfg.get("encoder", "onehot")]
+    scaler = scaler_factory() if callable(scaler_factory) else scaler_factory
+    encoder = _ENCODERS[prep_cfg.get("encoder", "onehot")](seed)
 
-    num_strategy = prep_cfg["imputation"].get("numeric_strategy", "median")
-    cat_strategy = prep_cfg["imputation"].get("categorical_strategy", "most_frequent")
+    numeric_strategy = imputation.get("numeric_strategy", "median")
+    if numeric_strategy not in _NUMERIC_IMPUTERS:
+        raise ValueError(f"Unknown numeric_strategy: {numeric_strategy}. Options: {list(_NUMERIC_IMPUTERS)}")
+
+    cat_strategy = imputation.get("categorical_strategy", "most_frequent")
 
     numeric = Pipeline([
-        ("impute", SimpleImputer(strategy=num_strategy)),
-        ("scale", scaler_factory() if callable(scaler_factory) else scaler_factory),
+        ("scale", scaler),
+        ("impute", _NUMERIC_IMPUTERS[numeric_strategy](imputation, seed)),
     ])
     categorical = Pipeline([
         ("impute", SimpleImputer(strategy=cat_strategy)),
-        ("encode", encoder_factory()),
+        ("encode", encoder),
     ])
 
     transformers = [
@@ -251,8 +282,8 @@ def preprocess(df: pd.DataFrame, config: dict = None):
 
 def prepare_inference_features(df_new: pd.DataFrame, config: dict) -> tuple[pd.DataFrame, pd.Series]:
     """
-    Prepara dados novos sem target (ex: adult_new.csv) aplicando exatamente a mesma limpeza
-    (sem remover linhas) e extração de features do treino.
+    Prepara dados novos sem target aplicando a mesma limpeza (sem remover duplicados)
+    e engenharia de atributos usada no treino.
     """
     target = config["data"]["target"]
     sensitive_attr = config["data"]["sensitive_attr"]
