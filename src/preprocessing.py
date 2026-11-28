@@ -20,6 +20,9 @@ from sklearn.preprocessing import (
     StandardScaler,
     TargetEncoder,
 )
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.ensemble import IsolationForest, RandomForestRegressor
+from sklearn.neighbors import LocalOutlierFactor
 
 from src.features import COMPASFeatureEngineer
 
@@ -164,7 +167,47 @@ _NUMERIC_IMPUTERS = {
     ),
 }
 
+class AnomalyScore(TransformerMixin, BaseEstimator):
+    """
+    Appends one column, `anomaly_score`, to the preprocessed features: how unusual each row is
+    compared with the training rows (higher = more unusual). `method` is "isolation_forest"
+    (s(x), ~0.5 for ordinary rows and -> 1 for anomalies) or "lof" (Local Outlier Factor, ~1 for
+    ordinary rows; `n_neighbors` must exceed the largest group of identical rows).
+    """
 
+    def __init__(self, method: str = "isolation_forest", n_neighbors: int = 20, random_state=None):
+        self.method = method
+        self.n_neighbors = n_neighbors
+        self.random_state = random_state
+
+    def fit(self, X, y=None):
+        X_arr = np.asarray(X)
+        if self.method == "isolation_forest":
+            self.detector_ = IsolationForest(random_state=self.random_state)
+        elif self.method == "lof":
+            self.detector_ = LocalOutlierFactor(n_neighbors=self.n_neighbors, novelty=True)
+        else:
+            raise ValueError(f"Unknown anomaly method: {self.method}. Options: isolation_forest, lof")
+        self.detector_.fit(X_arr)
+        self.n_features_in_ = X_arr.shape[1]
+        return self
+
+    def fit_transform(self, X, y=None):
+        """Fits on X and scores it. LOF uses negative_outlier_factor_ on training rows."""
+        self.fit(X)
+        if self.method == "lof":
+            return np.column_stack([X, -self.detector_.negative_outlier_factor_])
+        return self.transform(X)
+
+    def transform(self, X):
+        X_arr = np.asarray(X)
+        return np.column_stack([X_arr, -self.detector_.score_samples(X_arr)])
+
+    def get_feature_names_out(self, input_features=None):
+        if input_features is None:
+            input_features = [f"x{i}" for i in range(self.n_features_in_)]
+        return np.append(np.asarray(input_features, dtype=object), "anomaly_score")
+    
 def build_preprocessor(numeric_features, categorical_features, indicator_features,
                        passthrough_features, config: dict) -> ColumnTransformer:
     prep_cfg = config["preprocessing"]

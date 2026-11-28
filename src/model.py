@@ -17,6 +17,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import Pipeline
 import inspect
+from src.preprocessing import AnomalyScore
 
 try:
     from xgboost import XGBClassifier
@@ -130,14 +131,35 @@ def build_model(model_config: dict):
     return estimator_cls(**params)
 
 
-def build_pipeline(preprocessor, model_config: dict, fs_config: dict = None):
-    """Constrói a pipeline com pré-processamento, seleção opcional e modelo."""
-    model = build_model(model_config)
+def build_pipeline(
+    preprocessor,
+    model_config: dict,
+    fs_config: dict = None,
+    anomaly_config: dict = None,
+    memory=None,
+) -> Pipeline:
+    """
+    Constrói a pipeline completa: preprocessor -> [anomaly] -> [selector] -> model.
+    """
     steps = [("preprocessor", preprocessor)]
 
-    if fs_config and fs_config.get("enabled", False):
-        fs_params = fs_config.get("params", {})
-        steps.append(("selector", VoteSelector(**fs_params)))
+    if anomaly_config and anomaly_config.get("method", "none") != "none":
+        steps.append((
+            "anomaly",
+            AnomalyScore(
+                method=anomaly_config["method"],
+                n_neighbors=anomaly_config.get("n_neighbors", 20),
+                random_state=anomaly_config.get("random_state"),
+            ),
+        ))
 
-    steps.append(("model", model))
-    return Pipeline(steps)
+    if fs_config and fs_config.get("enabled", False):
+        # Mantém o teu VoteSelector exatamente como estava configurado
+        from src.features import VoteSelector
+        steps.append((
+            "selector",
+            VoteSelector(**fs_config.get("params", {})),
+        ))
+
+    steps.append(("model", build_model(model_config)))
+    return Pipeline(steps, memory=memory)

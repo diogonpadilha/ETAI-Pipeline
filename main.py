@@ -28,12 +28,23 @@ def main():
     df = load_data(config["data"]["path"])
 
     imputer_name = config.get("preprocessing", {}).get("imputation", {}).get("numeric_strategy", "median")
-    print(f"Running pipeline | config={config_path} | model={config['model']['type']} | imputer={imputer_name}")
+    anomaly_cfg = config.get("anomaly", {"method": "none"})
+    anomaly_method = anomaly_cfg.get("method", "none")
+
+    print(
+        f"Running pipeline | config={config_path} | model={config['model']['type']} "
+        f"| imputer={imputer_name} | anomaly={anomaly_method}"
+    )
 
     X_dev, X_test, y_dev, y_test, extras_test, preprocessor = preprocess(df, config=config)
 
     fs_config = config.get("feature_selection", {})
-    base_pipeline = build_pipeline(preprocessor, config["model"], fs_config)
+    base_pipeline = build_pipeline(
+        preprocessor,
+        config["model"],
+        fs_config=fs_config,
+        anomaly_config=anomaly_cfg,
+    )
 
     tuning_report = ""
     cv_score = 0.0
@@ -75,6 +86,8 @@ def main():
     if "selector" in pipeline.named_steps:
         try:
             feature_names = pipeline.named_steps["preprocessor"].get_feature_names_out()
+            if "anomaly" in pipeline.named_steps:
+                feature_names = pipeline.named_steps["anomaly"].get_feature_names_out(feature_names)
             mask = pipeline.named_steps["selector"].get_support()
             features_kept = np.array(feature_names)[mask]
             features_dropped = np.array(feature_names)[~mask]
@@ -103,7 +116,15 @@ def main():
     scoreboard_path = config.get("output", {}).get("scoreboard", "results/scoreboard.csv")
     selection_metric = config.get("cv", {}).get("selection_metric", "roc_auc")
     model_name = config["model"]["type"] + ("_with_fs" if fs_config.get("enabled", False) else "")
-    save_scores(scoreboard_path, model_name, selection_metric, cv_score, best_params, imputer=imputer_name)
+    save_scores(
+        scoreboard_path,
+        model_name,
+        selection_metric,
+        cv_score,
+        best_params,
+        imputer=imputer_name,
+        anomaly=anomaly_method,
+    )
     print(f"Resultado guardado no scoreboard central: {scoreboard_path}")
 
     # Guardar a pipeline final ajustada para inferência (predict.py)

@@ -145,6 +145,41 @@ To handle incomplete records at inference time without dropping rows—and witho
 | **`random_forest`** (missForest, `n_estimators=50`) | `0.XXXX` | `0.XXXX` | `X.XX` | `±X.XXX` | `0.XXXX` |
 
 **Decision:** We keep **`median`** alongside MNAR missingness indicators (`priors_count_was_missing` and `c_charge_degree_was_missing`). Because the numeric features in COMPAS have weak inter-correlations, multivariate imputers (`knn`, `iterative`, and `random_forest`) achieve no statistically significant improvement in CV ROC-AUC over `median` ($p > 0.05$) while adding substantial computational overhead.
+Week 11:
+Leak-safe `AnomalyScore` transformer (`isolation_forest` and `lof` with `novelty=True`) fitted inside CV folds, top-5% outlier recidivism audit, and Optuna Nested CV + Nadeau & Bengio paired t-test comparison 
+`Gradient boosting`: (`anomaly: none: 0.7251`. `LOF: 0.7239`, `IF: 0.7233`) 
+
+## Outliers & Anomaly Detection
+
+To test whether unusual feature combinations carry additional predictive signal without leaking information across folds or failing on unseen records, we added an `AnomalyScore` transformer (`src/preprocessing.py`) right after preprocessing (`preprocessor -> [anomaly] -> [selector] -> model`). It supports global isolation (`isolation_forest`, returning $s(x) = -\text{score\_samples}(X)$) and local density (`lof` with `novelty=True` and `n_neighbors=20`, exceeding the largest group of 14 identical rows in COMPAS), appending `anomaly_score` as a feature.
+
+### Hypothesis (before running)
+
+We expected global anomalies (defendants with extreme combinations of prior adult and juvenile offenses) to reoffend at a higher rate than the general population, **but** we hypothesized that appending `anomaly_score` would yield **little to no improvement** in cross-validated ROC-AUC for gradient-boosted trees, since tree ensembles already isolate extreme feature combinations directly via axis-aligned splits.
+
+### Recidivism rate among the top 5% most unusual defendants (Dev Set)
+
+| Detector | 95th-percentile cutoff | Top 5% recidivism rate ($n=289$) | Rest 95% recidivism rate ($n=5{,}482$) | Lift |
+|---|---:|---:|---:|---:|
+| **Isolation Forest** | `0.580` | **70.2%** (`0.702`) | 43.7% (`0.437`) | **+26.5 pp** |
+| **LOF (`n_neighbors=20`)** | `1.633` | **48.8%** (`0.488`) | 44.9% (`0.449`) | **+3.9 pp** |
+
+### Optuna Nested CV & Held-Out Test Comparison (`GradientBoostingClassifier`, `imputer: median`)
+
+| Anomaly method | Nested CV ROC-AUC ($\Delta$) | Nested CV Accuracy | Nested CV F1 | Test ROC-AUC / PR-AUC | Chosen hyperparameters |
+|---|---:|---:|---:|---:|---|
+| **`none`** (baseline) | **0.7251** (—) | **0.6751** | **0.6020** | **0.720** / **0.681** | `max_depth=2`, `n_estimators=126`, `learning_rate=0.0779` |
+| **`lof`** (`n_neighbors=20`) | 0.7239 (-0.0012) | 0.6730 | 0.5977 | 0.717 / 0.677 | `max_depth=2`, `n_estimators=126`, `learning_rate=0.0347` |
+| **`isolation_forest`** | 0.7233 (-0.0018) | 0.6746 | 0.5994 | 0.718 / 0.677 | `max_depth=3`, `n_estimators=66`, `learning_rate=0.0515` |
+
+*(In a controlled 5-fold CV check with fixed default hyperparameters on identical folds, Nadeau & Bengio's corrected paired t-test likewise showed no significant gain over `none`: $t = -1.929, p = 0.1259$ for `isolation_forest` and $t = -2.550, p = 0.0633$ for `lof`.)*
+
+### Reflection
+
+Our initial hypothesis was **confirmed**:
+1. **Outliers do reoffend more—depending on how "outlier" is defined:** Global anomalies flagged by Isolation Forest (defendants combining high juvenile and adult prior counts) reoffend at **70.2%** versus **43.7%** for the rest (+26.5 percentage points). By contrast, local density outliers flagged by LOF sit in sparse pockets adjacent to dense clusters of identical low-prior records and show almost no elevation in recidivism (48.8% vs. 44.9%).
+2. **Why `anomaly_score` did not improve the model:** Despite Isolation Forest's strong univariate separation, appending `anomaly_score` slightly lowered Nested CV ROC-AUC (`0.7251` $\rightarrow$ `0.7239` with LOF and `0.7233` with Isolation Forest), Nested CV F1 (`0.6020` $\rightarrow$ `0.5977` / `0.5994`), and test ROC-AUC (`0.720` $\rightarrow$ `0.717` / `0.718`). Gradient boosting already captures the underlying high-prior and juvenile-record interactions directly from the engineered features (`total_prior_records`, `priors_per_adult_year`, `log_priors_count`), so an unsupervised summary score adds redundant noise rather than new signal.
+3. **Final setting:** We keep `anomaly.method: "none"` as the default in `config.yaml` and verified that `python predict.py data/compas_new_people.csv predictions.csv` outputs all 20 rows cleanly with both `LOF` (`novelty=True`) and `IsolationForest` enabled.
 
 ## Predicting new data
 

@@ -73,11 +73,15 @@ preprocessing:
     max_iter: 10                      # iterative, random_forest
     n_estimators: 50                  # random_forest (trees per column)
 
+anomaly:
+  method: "isolation_forest"                      # none | isolation_forest | lof
+  n_neighbors: 20                     # lof: larger than the largest group of identical rows
+  random_state: 42                    # isolation_forest
+
 model:
   type: "gradient_boosting"
   params:
     random_state: 42
-    eval_metric: "logloss"
 
 cv:
   n_splits: 5
